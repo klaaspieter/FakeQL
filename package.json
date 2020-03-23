@@ -1,0 +1,9 @@
+{
+  "name": "FakeQL",
+  "version": "0.0.1",
+  "description": "Automatic GraphQL mocks",
+  "main": "index.js",
+  "author": "Klaas Pieter Annema",
+  "license": "MIT",
+  "private": false
+}
