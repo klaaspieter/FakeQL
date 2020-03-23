@@ -2,18 +2,26 @@
   "name": "FakeQL",
   "version": "0.0.1",
   "description": "Automatic GraphQL mocks",
-  "main": "index.js",
+  "main": "build/index.js",
   "author": "Klaas Pieter Annema",
   "license": "MIT",
   "scripts": {
     "test": "jest",
-    "build": "tsc"
+    "build": "tsc",
+    "lint": "tsc --noEmit && eslint '*/**/*.ts'"
   },
+  "types": "build/index.d.ts",
+  "files": [
+    "build/**/*"
+  ],
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "files": ["build/**/*"],
   "devDependencies": {
     "@types/jest": "^25.1.4",
+    "@typescript-eslint/eslint-plugin": "^2.24.0",
+    "@typescript-eslint/parser": "^2.24.0",
+    "eslint": "^6.8.0",
     "graphql": "^14.6.0",
     "jest": "^25.1.0",
     "ts-jest": "^25.2.1",

@@ -1,7 +1,10 @@
 import { DocumentNode, SelectionSetNode } from "graphql";
 
-const traverse = (set: SelectionSetNode): Record<string, any> => {
-  const object: Record<string, any> = {};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Mock = Record<string, any>;
+
+const traverse = (set: SelectionSetNode): Mock => {
+  const object: Mock = {};
   for (const selection of set.selections) {
     switch (selection.kind) {
       case "Field":
@@ -25,7 +28,7 @@ const traverse = (set: SelectionSetNode): Record<string, any> => {
 interface FakeQLProps {
   document: DocumentNode;
 }
-export const fakeQL = ({ document }: FakeQLProps): Record<string, any> => {
+export const fakeQL = ({ document }: FakeQLProps): Mock => {
   const definition = document.definitions[0];
   if (definition.kind !== "OperationDefinition") {
     throw new Error(
