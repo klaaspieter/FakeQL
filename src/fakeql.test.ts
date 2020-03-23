@@ -2,18 +2,23 @@ import { parse } from "graphql";
 import { fakeQL } from "./index";
 
 describe("fakeQL", () => {
-  it("can mock queries", () => {
+  it("can mock queries with fragments", () => {
     const document = parse(`
       query me {
         user {
           name
           age
           teams {
-            name
-            userCanAdminister
+            ...team
           }
         }
       }
+
+      fragment team on User {
+        name
+        userCanAdminister
+      }
+
     `);
 
     expect(
@@ -32,10 +37,11 @@ describe("fakeQL", () => {
     });
   });
 
-  it("fails when document is not an OperationDefinition", () => {
+  it("fails when document has no operations", () => {
     const document = parse(`
-      fragment foo on Foo {
-        bar
+      type Team {
+        name: String!
+        userCanAdminister: Boolean!
       }
     `);
 
@@ -44,7 +50,7 @@ describe("fakeQL", () => {
         document,
       })
     ).toThrow(
-      "FakeQL: Only definitions of kind operation can be mocked. Got definition of kind 'FragmentDefinition'"
+      "FakeQL: Document has no operations. Ensure your GraphQL document has a query directive"
     );
   });
 });
