@@ -1,4 +1,26 @@
-import { DocumentNode } from "graphql";
+import { DocumentNode, SelectionSetNode } from "graphql";
+
+const traverse = (set: SelectionSetNode): Record<string, any> => {
+  const object: Record<string, any> = {};
+  for (const selection of set.selections) {
+    switch (selection.kind) {
+      case "Field":
+        if (selection.selectionSet) {
+          object[selection.name.value] = traverse(selection.selectionSet);
+        } else {
+          object[
+            selection.name.value
+          ] = `mock-value-for-field-"${selection.name.value}"`;
+        }
+        break;
+      default:
+        console.log("do nothing for", selection);
+        break;
+    }
+  }
+
+  return object;
+};
 
 interface FakeQLProps {
   document: DocumentNode;
@@ -11,5 +33,5 @@ export const fakeQL = ({ document }: FakeQLProps): Record<string, any> => {
     );
   }
 
-  return {};
+  return traverse(definition.selectionSet);
 };
