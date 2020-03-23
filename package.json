@@ -1,5 +1,5 @@
 {
-  "name": "FakeQL",
+  "name": "fakeql",
   "version": "0.0.1",
   "description": "Automatic GraphQL mocks",
   "main": "build/index.js",

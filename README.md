@@ -7,13 +7,13 @@ Automatic GraphQL mocks
 ### npm
 
 ```sh
-npm install --save-dev FakeQL
+npm install --save-dev fakeql
 ```
 
 ### yarn
 
 ```sh
-yarn add --dev FakeQL
+yarn add --dev fakeql
 ```
 
 ## Usage
