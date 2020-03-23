@@ -8,7 +8,10 @@
   "scripts": {
     "test": "jest",
     "build": "tsc",
-    "lint": "tsc --noEmit && eslint '*/**/*.ts'"
+    "lint": "tsc --noEmit && eslint '*/**/*.ts'",
+    "prepare": "yarn build",
+    "prepublishOnly": "yarn test",
+    "preversion": "yarn test"
   },
   "types": "build/index.d.ts",
   "files": [
