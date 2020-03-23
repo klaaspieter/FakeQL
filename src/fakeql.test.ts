@@ -18,7 +18,7 @@ describe("fakeQL", () => {
 
     expect(
       fakeQL({
-        document
+        document,
       })
     ).toEqual({
       user: {
@@ -26,9 +26,9 @@ describe("fakeQL", () => {
         age: 'mock-value-for-field-"age"',
         teams: {
           name: 'mock-value-for-field-"name"',
-          userCanAdminister: 'mock-value-for-field-"userCanAdminister"'
-        }
-      }
+          userCanAdminister: 'mock-value-for-field-"userCanAdminister"',
+        },
+      },
     });
   });
 
@@ -41,7 +41,7 @@ describe("fakeQL", () => {
 
     expect(() =>
       fakeQL({
-        document
+        document,
       })
     ).toThrow(
       "FakeQL: Only definitions of kind operation can be mocked. Got definition of kind 'FragmentDefinition'"
