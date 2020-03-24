@@ -1,0 +1,1 @@
+export { FakeQLError } from "./fakeQLError";

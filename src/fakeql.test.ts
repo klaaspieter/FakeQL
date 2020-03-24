@@ -1,11 +1,28 @@
-import { parse } from "graphql";
+import { parse, buildSchema } from "graphql";
 import { fakeQL } from "./index";
 
+const schema = buildSchema(`
+  type User {
+    name: String!
+    age: Int!
+    teams: [Team]!
+  }
+
+  type Team {
+    name: String!
+    userCanAdminister: Boolean!
+  }
+
+  type Query {
+    me: User
+  }
+`);
+
 describe("fakeQL", () => {
-  it("can mock queries with fragments", () => {
+  it("can mock queries", () => {
     const document = parse(`
       query me {
-        user {
+        me {
           name
           age
           teams {
@@ -14,30 +31,48 @@ describe("fakeQL", () => {
         }
       }
 
-      fragment team on User {
+      fragment team on Team {
         name
         userCanAdminister
       }
-
     `);
 
     expect(
       fakeQL({
         document,
+        schema,
       })
     ).toEqual({
-      user: {
+      me: {
         name: 'mock-value-for-field-"name"',
-        age: 'mock-value-for-field-"age"',
-        teams: {
-          name: 'mock-value-for-field-"name"',
-          userCanAdminister: 'mock-value-for-field-"userCanAdminister"',
-        },
+        age: 42,
+        teams: [
+          {
+            name: 'mock-value-for-field-"name"',
+            userCanAdminister: false,
+          },
+        ],
       },
     });
   });
 
-  it("fails when document has no operations", () => {
+  it("fails when schema is invalid", () => {
+    const schema = buildSchema(`
+      type Team {
+        name: String!
+        userCanAdminister: Boolean!
+      }
+    `);
+
+    expect(() => {
+      fakeQL({
+        document: parse(`query { me { name } }`),
+        schema,
+      });
+    }).toThrow();
+  });
+
+  it("fails when document is invalid", () => {
     const document = parse(`
       type Team {
         name: String!
@@ -48,9 +83,8 @@ describe("fakeQL", () => {
     expect(() =>
       fakeQL({
         document,
+        schema,
       })
-    ).toThrow(
-      "FakeQL: Document has no operations. Ensure your GraphQL document has a query directive"
-    );
+    ).toThrow();
   });
 });

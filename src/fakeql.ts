@@ -1,77 +1,92 @@
 import {
+  visit,
+  visitWithTypeInfo,
+  parse,
+  isNonNullType,
   DocumentNode,
-  SelectionSetNode,
-  DefinitionNode,
-  OperationDefinitionNode,
-  FragmentDefinitionNode,
+  validate,
+  validateSchema,
+  TypeInfo,
+  GraphQLSchema,
+  isObjectType,
+  isScalarType,
+  GraphQLScalarType,
+  isListType,
 } from "graphql";
+import { assign } from "./assign";
+import { FakeQLError } from "./error";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Mock = Record<string, any>;
-type FragmentMap = { [key: string]: Mock };
 
-interface TraverseOptions {
-  fragments: FragmentMap;
-}
-const traverse = (
-  set: SelectionSetNode,
-  { fragments = {} }: Partial<TraverseOptions> = {}
-): Mock => {
-  let object: Mock = {};
-  for (const selection of set.selections) {
-    switch (selection.kind) {
-      case "Field":
-        if (selection.selectionSet) {
-          object[selection.name.value] = traverse(selection.selectionSet, {
-            fragments,
-          });
-        } else {
-          object[
-            selection.name.value
-          ] = `mock-value-for-field-"${selection.name.value}"`;
-        }
-        break;
+const valueForScalarType = (type: GraphQLScalarType, name: string): unknown => {
+  switch (type.name) {
+    case "String":
+      return `mock-value-for-field-"${name}"`;
+    case "Int":
+      return 42;
 
-      case "FragmentSpread":
-        object = { ...object, ...fragments[selection.name.value] };
-        break;
-      default:
-        console.warn("FakeQL: doing nothing for", selection);
-        break;
-    }
+    case "Boolean":
+      return false;
+
+    default:
+      console.log("Do nothing for scalar", type.name);
+      return {};
   }
-
-  return object;
 };
-
-const isFragment = (
-  definition: DefinitionNode
-): definition is FragmentDefinitionNode =>
-  definition.kind === "FragmentDefinition";
-
-const isOperation = (
-  definition: DefinitionNode
-): definition is OperationDefinitionNode =>
-  definition.kind === "OperationDefinition";
 
 interface FakeQLProps {
   document: DocumentNode;
+  schema: GraphQLSchema;
 }
-export const fakeQL = ({ document }: FakeQLProps): Mock => {
-  const fragments = document.definitions.filter(isFragment).reduce(
-    (fragments, definition) => ({
-      ...fragments,
-      ...{ [definition.name.value]: traverse(definition.selectionSet) },
-    }),
-    {} as FragmentMap
+export const fakeQL = ({ document, schema }: FakeQLProps): Mock => {
+  const schemaValidationErrors = validateSchema(schema);
+  if (schemaValidationErrors.length > 0) {
+    throw new FakeQLError("Invalid Schema", schemaValidationErrors);
+  }
+
+  const source = document && document.loc && document.loc.source;
+  if (!source) {
+    throw new FakeQLError("The provided document has no source");
+  }
+  const documentAST = parse(source);
+
+  const validationErrors = validate(schema, documentAST);
+  if (validationErrors.length > 0) {
+    throw new FakeQLError("Invalid Document", validationErrors);
+  }
+
+  const typeInfo = new TypeInfo(schema);
+
+  let mock: Mock = {};
+  let path: (string | number)[] = [];
+  visit(
+    documentAST,
+    visitWithTypeInfo(typeInfo, {
+      enter: (node) => {
+        switch (node.kind) {
+          case "Field": {
+            let type = typeInfo.getType();
+
+            if (isNonNullType(type)) {
+              type = type.ofType;
+            }
+
+            if (isScalarType(type)) {
+              const value = valueForScalarType(type, node.name.value);
+              mock = assign(mock, [...path, node.name.value], value);
+            } else if (isListType(type)) {
+              path = [...path, node.name.value, 0];
+            } else if (isObjectType(type)) {
+              path = [...path, node.name.value];
+            }
+
+            break;
+          }
+        }
+      },
+    })
   );
 
-  const definition = document.definitions.find(isOperation);
-
-  if (!definition) {
-    throw new Error(
-      "FakeQL: Document has no operations. Ensure your GraphQL document has a query directive"
-    );
-  }
-  return traverse(definition.selectionSet, { fragments });
+  return mock;
 };
