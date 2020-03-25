@@ -12,6 +12,7 @@ import {
   isScalarType,
   GraphQLScalarType,
   isListType,
+  GraphQLCompositeType,
 } from "graphql";
 import { assign } from "./assign";
 import { FakeQLError } from "./error";
@@ -73,8 +74,20 @@ export const fakeQL = ({ document, schema }: FakeQLProps): Mock => {
             }
 
             if (isScalarType(type)) {
-              const value = valueForScalarType(type, node.name.value);
-              mock = assign(mock, [...path, node.name.value], value);
+              if (
+                node.name.value === "__typename" &&
+                typeInfo.getParentType()
+              ) {
+                const parentType = typeInfo.getParentType() as GraphQLCompositeType;
+                mock = assign(
+                  mock,
+                  [...path, node.name.value],
+                  parentType.name
+                );
+              } else {
+                const value = valueForScalarType(type, node.name.value);
+                mock = assign(mock, [...path, node.name.value], value);
+              }
             } else if (isListType(type)) {
               path = [...path, node.name.value, 0];
             } else if (isObjectType(type)) {

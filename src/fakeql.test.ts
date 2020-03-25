@@ -23,6 +23,7 @@ describe("fakeQL", () => {
     const document = parse(`
       query me {
         me {
+          __typename
           name
           age
           teams {
@@ -32,6 +33,7 @@ describe("fakeQL", () => {
       }
 
       fragment team on Team {
+        __typename
         name
         userCanAdminister
       }
@@ -44,10 +46,12 @@ describe("fakeQL", () => {
       })
     ).toEqual({
       me: {
+        __typename: "User",
         name: 'mock-value-for-field-"name"',
         age: 42,
         teams: [
           {
+            __typename: "Team",
             name: 'mock-value-for-field-"name"',
             userCanAdminister: false,
           },
