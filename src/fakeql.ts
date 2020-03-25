@@ -25,8 +25,12 @@ const valueForScalarType = (type: GraphQLScalarType, name: string): unknown => {
     default:
     case "String":
       return `mock-value-for-field-"${name}"`;
+
     case "Int":
       return 42;
+
+    case "Float":
+      return 4.2;
 
     case "Boolean":
       return false;

@@ -5,7 +5,8 @@ const schema = buildSchema(`
   scalar UUID
 
   type User {
-    id: UUID!
+    id: ID!
+    uuid: UUID!
     name: String!
     age: Int!
     teams: [Team]!
@@ -14,6 +15,7 @@ const schema = buildSchema(`
   type Team {
     name: String!
     userCanAdminister: Boolean!
+    price: Float!
   }
 
   type Query {
@@ -28,6 +30,7 @@ describe("fakeQL", () => {
         me {
           __typename
           id
+          uuid
           name
           age
           teams {
@@ -40,6 +43,7 @@ describe("fakeQL", () => {
         __typename
         name
         userCanAdminister
+        price
       }
     `);
 
@@ -52,6 +56,7 @@ describe("fakeQL", () => {
       me: {
         __typename: "User",
         id: 'mock-value-for-field-"id"',
+        uuid: 'mock-value-for-field-"uuid"',
         name: 'mock-value-for-field-"name"',
         age: 42,
         teams: [
@@ -59,6 +64,7 @@ describe("fakeQL", () => {
             __typename: "Team",
             name: 'mock-value-for-field-"name"',
             userCanAdminister: false,
+            price: 4.2,
           },
         ],
       },
