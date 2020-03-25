@@ -68,7 +68,8 @@ export const fakeQL = ({ document, schema, resolvers }: FakeQLProps): Mock => {
     throw new FakeQLError("Invalid Schema", schemaValidationErrors);
   }
 
-  const source = document && document.loc && document.loc.source;
+  const source =
+    document && document.loc && document.loc.source && document.loc.source.body;
   if (!source) {
     throw new FakeQLError("The provided document has no source");
   }
