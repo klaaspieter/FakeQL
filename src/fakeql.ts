@@ -22,6 +22,7 @@ type Mock = Record<string, any>;
 
 const valueForScalarType = (type: GraphQLScalarType, name: string): unknown => {
   switch (type.name) {
+    default:
     case "String":
       return `mock-value-for-field-"${name}"`;
     case "Int":
@@ -29,10 +30,6 @@ const valueForScalarType = (type: GraphQLScalarType, name: string): unknown => {
 
     case "Boolean":
       return false;
-
-    default:
-      console.log("Do nothing for scalar", type.name);
-      return {};
   }
 };
 

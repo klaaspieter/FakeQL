@@ -2,7 +2,10 @@ import { parse, buildSchema } from "graphql";
 import { fakeQL } from "./index";
 
 const schema = buildSchema(`
+  scalar UUID
+
   type User {
+    id: UUID!
     name: String!
     age: Int!
     teams: [Team]!
@@ -24,6 +27,7 @@ describe("fakeQL", () => {
       query me {
         me {
           __typename
+          id
           name
           age
           teams {
@@ -47,6 +51,7 @@ describe("fakeQL", () => {
     ).toEqual({
       me: {
         __typename: "User",
+        id: 'mock-value-for-field-"id"',
         name: 'mock-value-for-field-"name"',
         age: 42,
         teams: [
