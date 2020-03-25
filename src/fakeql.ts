@@ -23,7 +23,20 @@ import { FakeQLError } from "./error";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Mock = Record<string, any>;
 
-const valueForScalarType = (type: GraphQLScalarType, name: string): unknown => {
+type MockResolverMap = { [key: string]: MockResolver };
+interface MockResolver {
+  (): unknown;
+}
+
+const valueForScalarType = (
+  type: GraphQLScalarType,
+  name: string,
+  resolvers?: MockResolverMap
+): unknown => {
+  if (resolvers && resolvers[type.name]) {
+    return resolvers[type.name]();
+  }
+
   switch (type.name) {
     default:
     case "String":
@@ -43,8 +56,9 @@ const valueForScalarType = (type: GraphQLScalarType, name: string): unknown => {
 interface FakeQLProps {
   document: DocumentNode;
   schema: GraphQLSchema | IntrospectionQuery;
+  resolvers?: MockResolverMap;
 }
-export const fakeQL = ({ document, schema }: FakeQLProps): Mock => {
+export const fakeQL = ({ document, schema, resolvers }: FakeQLProps): Mock => {
   if (!isSchema(schema)) {
     schema = buildClientSchema(schema);
   }
@@ -93,7 +107,11 @@ export const fakeQL = ({ document, schema }: FakeQLProps): Mock => {
                   parentType.name
                 );
               } else {
-                const value = valueForScalarType(type, node.name.value);
+                const value = valueForScalarType(
+                  type,
+                  node.name.value,
+                  resolvers
+                );
                 mock = assign(mock, [...path, node.name.value], value);
               }
             } else if (isListType(type)) {

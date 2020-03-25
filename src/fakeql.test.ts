@@ -93,6 +93,38 @@ describe("fakeQL", () => {
     });
   });
 
+  it("supports custom resolvers", () => {
+    const document = parse(`
+      query me {
+        me {
+          name
+          age
+        }
+      }
+    `);
+    const introspectionQuery = introspectionFromSchema(schema);
+
+    expect(
+      fakeQL({
+        document,
+        schema: introspectionQuery,
+        resolvers: {
+          String(): string {
+            return "custom-string";
+          },
+          Int(): number {
+            return 84;
+          },
+        },
+      })
+    ).toEqual({
+      me: {
+        name: "custom-string",
+        age: 84,
+      },
+    });
+  });
+
   it("fails when schema is invalid", () => {
     const schema = buildSchema(`
       type Team {
