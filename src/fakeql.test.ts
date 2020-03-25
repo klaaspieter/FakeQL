@@ -1,4 +1,4 @@
-import { parse, buildSchema } from "graphql";
+import { parse, buildSchema, introspectionFromSchema } from "graphql";
 import { fakeQL } from "./index";
 
 const schema = buildSchema(`
@@ -67,6 +67,28 @@ describe("fakeQL", () => {
             price: 4.2,
           },
         ],
+      },
+    });
+  });
+
+  it("creates the schema from an IntrospectionQuery", () => {
+    const document = parse(`
+      query me {
+        me {
+          name
+        }
+      }
+    `);
+    const introspectionQuery = introspectionFromSchema(schema);
+
+    expect(
+      fakeQL({
+        document,
+        schema: introspectionQuery,
+      })
+    ).toEqual({
+      me: {
+        name: 'mock-value-for-field-"name"',
       },
     });
   });

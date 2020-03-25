@@ -13,6 +13,9 @@ import {
   GraphQLScalarType,
   isListType,
   GraphQLCompositeType,
+  buildClientSchema,
+  isSchema,
+  IntrospectionQuery,
 } from "graphql";
 import { assign } from "./assign";
 import { FakeQLError } from "./error";
@@ -39,9 +42,13 @@ const valueForScalarType = (type: GraphQLScalarType, name: string): unknown => {
 
 interface FakeQLProps {
   document: DocumentNode;
-  schema: GraphQLSchema;
+  schema: GraphQLSchema | IntrospectionQuery;
 }
 export const fakeQL = ({ document, schema }: FakeQLProps): Mock => {
+  if (!isSchema(schema)) {
+    schema = buildClientSchema(schema);
+  }
+
   const schemaValidationErrors = validateSchema(schema);
   if (schemaValidationErrors.length > 0) {
     throw new FakeQLError("Invalid Schema", schemaValidationErrors);
