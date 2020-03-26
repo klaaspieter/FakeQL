@@ -16,6 +16,7 @@ import {
   buildClientSchema,
   isSchema,
   IntrospectionQuery,
+  ValidationRule,
 } from "graphql";
 import { FakeQLError } from "./error";
 import set from "lodash.set";
@@ -58,8 +59,14 @@ interface FakeQLProps {
   document: DocumentNode;
   schema: GraphQLSchema | IntrospectionQuery;
   resolvers?: MockResolverMap;
+  validationRules?: ValidationRule[];
 }
-export const fakeQL = ({ document, schema, resolvers }: FakeQLProps): Mock => {
+export const fakeQL = ({
+  document,
+  schema,
+  resolvers,
+  validationRules,
+}: FakeQLProps): Mock => {
   if (!isSchema(schema)) {
     schema = buildClientSchema(schema);
   }
@@ -76,7 +83,7 @@ export const fakeQL = ({ document, schema, resolvers }: FakeQLProps): Mock => {
   }
   const documentAST = parse(source);
 
-  const validationErrors = validate(schema, documentAST);
+  const validationErrors = validate(schema, documentAST, validationRules);
   if (validationErrors.length > 0) {
     throw new FakeQLError("Invalid Document", validationErrors);
   }

@@ -142,7 +142,7 @@ describe("fakeQL", () => {
         schema: introspectionQuery,
         resolvers: {
           User(): unknown {
-            return { name: "Hello" };
+            return { name: "Hello" /*, doesNotExist: "*hides*" */ };
           },
         },
       })
@@ -184,5 +184,22 @@ describe("fakeQL", () => {
         schema,
       })
     ).toThrow();
+  });
+
+  it("supports customizing the validation rules", () => {
+    const document = parse(`
+      type Team {
+        name: String!
+        userCanAdminister: Boolean!
+      }
+    `);
+
+    expect(() =>
+      fakeQL({
+        document,
+        schema,
+        validationRules: [],
+      })
+    ).not.toThrow();
   });
 });
