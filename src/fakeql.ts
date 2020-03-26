@@ -17,8 +17,8 @@ import {
   isSchema,
   IntrospectionQuery,
 } from "graphql";
-import { assign } from "./assign";
 import { FakeQLError } from "./error";
+import set from "lodash.set";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Mock = Record<string, any>;
@@ -102,18 +102,14 @@ export const fakeQL = ({ document, schema, resolvers }: FakeQLProps): Mock => {
                 typeInfo.getParentType()
               ) {
                 const parentType = typeInfo.getParentType() as GraphQLCompositeType;
-                mock = assign(
-                  mock,
-                  [...path, node.name.value],
-                  parentType.name
-                );
+                mock = set(mock, [...path, node.name.value], parentType.name);
               } else {
                 const value = valueForScalarType(
                   type,
                   node.name.value,
                   resolvers
                 );
-                mock = assign(mock, [...path, node.name.value], value);
+                mock = set(mock, [...path, node.name.value], value);
               }
             } else if (isListType(type)) {
               path = [...path, node.name.value, 0];
