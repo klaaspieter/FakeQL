@@ -93,7 +93,7 @@ describe("fakeQL", () => {
     });
   });
 
-  it("supports custom resolvers", () => {
+  it("supports custom scalar resolvers", () => {
     const document = parse(`
       query me {
         me {
@@ -121,6 +121,35 @@ describe("fakeQL", () => {
       me: {
         name: "custom-string",
         age: 84,
+      },
+    });
+  });
+
+  it("supports custom type resolvers", () => {
+    const document = parse(`
+      query me {
+        me {
+          name
+          age
+        }
+      }
+    `);
+    const introspectionQuery = introspectionFromSchema(schema);
+
+    expect(
+      fakeQL({
+        document,
+        schema: introspectionQuery,
+        resolvers: {
+          User(): unknown {
+            return { name: "Hello" };
+          },
+        },
+      })
+    ).toEqual({
+      me: {
+        name: "Hello",
+        age: 42,
       },
     });
   });

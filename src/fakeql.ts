@@ -19,6 +19,7 @@ import {
 } from "graphql";
 import { FakeQLError } from "./error";
 import set from "lodash.set";
+import get from "lodash.get";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Mock = Record<string, any>;
@@ -104,16 +105,28 @@ export const fakeQL = ({ document, schema, resolvers }: FakeQLProps): Mock => {
                 const parentType = typeInfo.getParentType() as GraphQLCompositeType;
                 mock = set(mock, [...path, node.name.value], parentType.name);
               } else {
-                const value = valueForScalarType(
+                const defaultValue = valueForScalarType(
                   type,
                   node.name.value,
                   resolvers
+                );
+                const value = get(
+                  mock,
+                  [...path, node.name.value],
+                  defaultValue
                 );
                 mock = set(mock, [...path, node.name.value], value);
               }
             } else if (isListType(type)) {
               path = [...path, node.name.value, 0];
             } else if (isObjectType(type)) {
+              if (resolvers && resolvers[type.name]) {
+                mock = set(
+                  mock,
+                  [...path, node.name.value],
+                  resolvers[type.name]()
+                );
+              }
               path = [...path, node.name.value];
             }
 
