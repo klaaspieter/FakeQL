@@ -141,6 +141,23 @@ export const fakeQL = ({
           }
         }
       },
+      leave: (node) => {
+        if (node.kind !== "Field") {
+          return;
+        }
+        let type = typeInfo.getType();
+
+        if (isNonNullType(type)) {
+          type = type.ofType;
+        }
+
+        if (isListType(type)) {
+          path.pop();
+          path.pop();
+        } else if (isObjectType(type)) {
+          path.pop();
+        }
+      },
     })
   );
 

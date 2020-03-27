@@ -1,70 +1,300 @@
 import { parse, buildSchema, introspectionFromSchema } from "graphql";
 import { fakeQL } from "./index";
 
-const schema = buildSchema(`
-  scalar UUID
-
-  type User {
-    id: ID!
-    uuid: UUID!
-    name: String!
-    age: Int!
-    teams: [Team]!
-  }
-
-  type Team {
-    name: String!
-    userCanAdminister: Boolean!
-    price: Float!
-  }
-
-  type Query {
-    me: User
-  }
-`);
-
 describe("fakeQL", () => {
-  it("can mock queries", () => {
-    const document = parse(`
-      query me {
-        me {
-          __typename
-          id
-          uuid
-          name
-          age
-          teams {
-            ...team
-          }
-        }
+  it("mocks scalars with default values", () => {
+    const schema = buildSchema(`
+      type Query {
+        id: ID!
+        nullId: ID
+        string: String!
+        nullString: String
+        int: Int!
+        nullInt: Int
+        float: Float!
+        nullFloat: Float
+        boolean: Boolean!
+        nullBoolean: Boolean
       }
-
-      fragment team on Team {
+    `);
+    const document = parse(`
+      query {
         __typename
-        name
-        userCanAdminister
-        price
+        id
+        nullId
+        string
+        nullString
+        int
+        nullInt
+        float
+        nullFloat
+        boolean
+        nullBoolean
       }
     `);
 
-    expect(
-      fakeQL({
-        document,
-        schema,
-      })
-    ).toEqual({
+    const mock = fakeQL({ document, schema });
+
+    expect(mock).toEqual({
+      __typename: "Query",
+      id: `mock-value-for-field-"id"`,
+      nullId: `mock-value-for-field-"nullId"`,
+      string: `mock-value-for-field-"string"`,
+      nullString: `mock-value-for-field-"nullString"`,
+      int: 42,
+      nullInt: 42,
+      float: 4.2,
+      nullFloat: 4.2,
+      boolean: false,
+      nullBoolean: false,
+    });
+  });
+
+  it("mocks custom types", () => {
+    const schema = buildSchema(`
+      type User {
+        name: String!
+        age: Int!
+      }
+
+      type Query {
+        me: User
+      }
+    `);
+    const document = parse(`
+      query {
+        __typename
+        me {
+          __typename
+          name
+          age
+        }
+      }
+    `);
+
+    const mock = fakeQL({ document, schema });
+
+    expect(mock).toEqual({
+      __typename: "Query",
       me: {
         __typename: "User",
-        id: 'mock-value-for-field-"id"',
-        uuid: 'mock-value-for-field-"uuid"',
-        name: 'mock-value-for-field-"name"',
+        name: `mock-value-for-field-"name"`,
         age: 42,
-        teams: [
+      },
+    });
+  });
+
+  it("mocks nested types", () => {
+    const schema = buildSchema(`
+      type User {
+        name: String!
+        friends: [User]!
+        age: Int!
+        role: String!
+      }
+
+      type Query {
+        me: User
+      }
+    `);
+    const document = parse(`
+      query {
+        __typename
+        me {
+          __typename
+          friends {
+            __typename
+            name
+            age
+            friends {
+              friends {
+                name
+              }
+            }
+          }
+          # Order is important. Putting role below friends ensures that we enter
+          # the friends list generete the mock friend and then leave the list to
+          # generate the mock role.
+          role
+        }
+      }
+    `);
+
+    const mock = fakeQL({ document, schema });
+
+    expect(mock).toEqual({
+      __typename: "Query",
+      me: {
+        __typename: "User",
+        role: `mock-value-for-field-"role"`,
+        friends: [
           {
-            __typename: "Team",
-            name: 'mock-value-for-field-"name"',
-            userCanAdminister: false,
-            price: 4.2,
+            __typename: "User",
+            name: `mock-value-for-field-"name"`,
+            age: 42,
+            friends: [
+              {
+                friends: [
+                  {
+                    name: `mock-value-for-field-"name"`,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+  });
+
+  it("mocks sibling types", () => {
+    const schema = buildSchema(`
+      type User {
+        name: String!
+        friends: [User]!
+        invoices: [Invoice]!
+        age: Int!
+        role: String!
+      }
+
+      type Invoice {
+        date: String!
+      }
+
+      type Query {
+        me: User
+      }
+    `);
+    const document = parse(`
+      query {
+        __typename
+        me {
+          __typename
+          friends {
+            __typename
+            name
+            age
+          }
+          invoices {
+            __typename
+            date
+          }
+        }
+      }
+    `);
+
+    const mock = fakeQL({ document, schema });
+
+    expect(mock).toEqual({
+      __typename: "Query",
+      me: {
+        __typename: "User",
+        friends: [
+          { __typename: "User", name: `mock-value-for-field-"name"`, age: 42 },
+        ],
+        invoices: [
+          { __typename: "Invoice", date: `mock-value-for-field-"date"` },
+        ],
+      },
+    });
+  });
+
+  it("mocks nested and sibling types", () => {
+    const schema = buildSchema(`
+      type User {
+        name: String!
+        friends: [User]!
+        invoices: [Invoice]!
+        age: Int!
+        role: String!
+      }
+
+      type Invoice {
+        date: String!
+        user: User!
+      }
+
+      type Query {
+        me: User
+      }
+    `);
+    const document = parse(`
+      query {
+        __typename
+        me {
+          __typename
+          friends {
+            __typename
+            name
+            invoices {
+              user {
+                invoices {
+                  date
+                  user {
+                    name
+                  }
+                }
+                name
+              }
+            }
+            age
+          }
+          invoices {
+            __typename
+            date
+            user {
+              invoices {
+                user {
+                  name
+                }
+                date
+              }
+            }
+          }
+        }
+      }
+    `);
+
+    const mock = fakeQL({ document, schema });
+
+    expect(mock).toEqual({
+      __typename: "Query",
+      me: {
+        __typename: "User",
+        friends: [
+          {
+            __typename: "User",
+            name: `mock-value-for-field-"name"`,
+            age: 42,
+            invoices: [
+              {
+                user: {
+                  name: `mock-value-for-field-"name"`,
+                  invoices: [
+                    {
+                      date: `mock-value-for-field-"date"`,
+                      user: {
+                        name: `mock-value-for-field-"name"`,
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+        invoices: [
+          {
+            __typename: "Invoice",
+            date: `mock-value-for-field-"date"`,
+            user: {
+              invoices: [
+                {
+                  date: `mock-value-for-field-"date"`,
+                  user: { name: `mock-value-for-field-"name"` },
+                },
+              ],
+            },
           },
         ],
       },
@@ -72,6 +302,15 @@ describe("fakeQL", () => {
   });
 
   it("creates the schema from an IntrospectionQuery", () => {
+    const schema = buildSchema(`
+      type User {
+        name: String
+      }
+
+      type Query {
+        me: User!
+      }
+    `);
     const document = parse(`
       query me {
         me {
@@ -94,6 +333,16 @@ describe("fakeQL", () => {
   });
 
   it("supports custom scalar resolvers", () => {
+    const schema = buildSchema(`
+      type User {
+        name: String!
+        age: Int!
+      }
+
+      type Query {
+        me: User!
+      }
+    `);
     const document = parse(`
       query me {
         me {
@@ -126,6 +375,15 @@ describe("fakeQL", () => {
   });
 
   it("supports custom type resolvers", () => {
+    const schema = buildSchema(`
+      type User {
+        name: String!
+        age: Int!
+      }
+      type Query {
+        me: User!
+      }
+    `);
     const document = parse(`
       query me {
         me {
@@ -142,7 +400,7 @@ describe("fakeQL", () => {
         schema: introspectionQuery,
         resolvers: {
           User(): unknown {
-            return { name: "Hello" /*, doesNotExist: "*hides*" */ };
+            return { name: "Hello" };
           },
         },
       })
@@ -156,6 +414,7 @@ describe("fakeQL", () => {
 
   it("fails when schema is invalid", () => {
     const schema = buildSchema(`
+      # Schema is missing type Query
       type Team {
         name: String!
         userCanAdminister: Boolean!
@@ -171,7 +430,9 @@ describe("fakeQL", () => {
   });
 
   it("fails when document is invalid", () => {
+    const schema = buildSchema(`type Query { x: String! }`);
     const document = parse(`
+      # Document is querying a type that doesn't exit
       type Team {
         name: String!
         userCanAdminister: Boolean!
@@ -187,7 +448,11 @@ describe("fakeQL", () => {
   });
 
   it("supports customizing the validation rules", () => {
+    const schema = buildSchema(`type Query { x: String! }`);
     const document = parse(`
+      # This is a syntactically valid document but querying the wrong fields
+      # With all validation rules disabled querying the wrong fields won't throw
+      # an error
       type Team {
         name: String!
         userCanAdminister: Boolean!
