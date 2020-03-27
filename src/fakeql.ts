@@ -17,6 +17,7 @@ import {
   isSchema,
   IntrospectionQuery,
   ValidationRule,
+  isEnumType,
 } from "graphql";
 import { FakeQLError } from "./error";
 import set from "lodash.set";
@@ -135,6 +136,17 @@ export const fakeQL = ({
                 );
               }
               path = [...path, node.name.value];
+            } else if (isEnumType(type)) {
+              const values = type.getValues();
+
+              if (values.length <= 0) {
+                // A GraphQL enum with no members should be impossible, but it's
+                // not enforced in the types. In other words it is possible this
+                // array is empty.
+                return;
+              }
+
+              mock = set(mock, [...path, node.name.value], values[0].name);
             }
 
             break;

@@ -84,6 +84,38 @@ describe("fakeQL", () => {
     });
   });
 
+  it("mocks custom enums", () => {
+    const schema = buildSchema(`
+      type User {
+        name: String!
+        role: Role!
+      }
+
+      enum Role {
+        ADMIN
+        MEMBER
+      }
+
+      type Query {
+        me: User
+      }
+    `);
+    const document = parse(`
+      query {
+        me {
+          name
+          role
+        }
+      }
+    `);
+
+    const mock = fakeQL({ document, schema });
+
+    expect(mock).toEqual({
+      me: { name: `mock-value-for-field-"name"`, role: "ADMIN" },
+    });
+  });
+
   it("mocks nested types", () => {
     const schema = buildSchema(`
       type User {
