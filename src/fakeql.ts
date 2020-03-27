@@ -96,79 +96,66 @@ export const fakeQL = ({
   visit(
     documentAST,
     visitWithTypeInfo(typeInfo, {
-      enter: (node) => {
-        switch (node.kind) {
-          case "Field": {
-            let type = typeInfo.getType();
+      Field: {
+        enter(node): void {
+          let type = typeInfo.getType();
 
-            if (isNonNullType(type)) {
-              type = type.ofType;
-            }
-
-            if (isScalarType(type)) {
-              if (
-                node.name.value === "__typename" &&
-                typeInfo.getParentType()
-              ) {
-                const parentType = typeInfo.getParentType() as GraphQLCompositeType;
-                mock = set(mock, [...path, node.name.value], parentType.name);
-              } else {
-                const defaultValue = valueForScalarType(
-                  type,
-                  node.name.value,
-                  resolvers
-                );
-                const value = get(
-                  mock,
-                  [...path, node.name.value],
-                  defaultValue
-                );
-                mock = set(mock, [...path, node.name.value], value);
-              }
-            } else if (isListType(type)) {
-              path = [...path, node.name.value, 0];
-            } else if (isObjectType(type)) {
-              if (resolvers && resolvers[type.name]) {
-                mock = set(
-                  mock,
-                  [...path, node.name.value],
-                  resolvers[type.name]()
-                );
-              }
-              path = [...path, node.name.value];
-            } else if (isEnumType(type)) {
-              const values = type.getValues();
-
-              if (values.length <= 0) {
-                // A GraphQL enum with no members should be impossible, but it's
-                // not enforced in the types. In other words it is possible this
-                // array is empty.
-                return;
-              }
-
-              mock = set(mock, [...path, node.name.value], values[0].name);
-            }
-
-            break;
+          if (isNonNullType(type)) {
+            type = type.ofType;
           }
-        }
-      },
-      leave: (node) => {
-        if (node.kind !== "Field") {
-          return;
-        }
-        let type = typeInfo.getType();
 
-        if (isNonNullType(type)) {
-          type = type.ofType;
-        }
+          if (isScalarType(type)) {
+            if (node.name.value === "__typename" && typeInfo.getParentType()) {
+              const parentType = typeInfo.getParentType() as GraphQLCompositeType;
+              mock = set(mock, [...path, node.name.value], parentType.name);
+            } else {
+              const defaultValue = valueForScalarType(
+                type,
+                node.name.value,
+                resolvers
+              );
+              const value = get(mock, [...path, node.name.value], defaultValue);
+              mock = set(mock, [...path, node.name.value], value);
+            }
+          } else if (isListType(type)) {
+            path = [...path, node.name.value, 0];
+          } else if (isObjectType(type)) {
+            if (resolvers && resolvers[type.name]) {
+              mock = set(
+                mock,
+                [...path, node.name.value],
+                resolvers[type.name]()
+              );
+            }
+            path = [...path, node.name.value];
+          } else if (isEnumType(type)) {
+            const values = type.getValues();
+            let value: unknown;
 
-        if (isListType(type)) {
-          path.pop();
-          path.pop();
-        } else if (isObjectType(type)) {
-          path.pop();
-        }
+            if (values.length > 0) {
+              // A GraphQL enum with no members should be impossible, but it's
+              // not enforced in the types. In other words it is possible this
+              // array is empty.
+              value = values[0].name;
+            }
+
+            mock = set(mock, [...path, node.name.value], value);
+          }
+        },
+        leave(): void {
+          let type = typeInfo.getType();
+
+          if (isNonNullType(type)) {
+            type = type.ofType;
+          }
+
+          if (isListType(type)) {
+            path.pop();
+            path.pop();
+          } else if (isObjectType(type)) {
+            path.pop();
+          }
+        },
       },
     })
   );
