@@ -132,7 +132,9 @@ export const fakeQL = ({
             const values = type.getValues();
             let value: unknown;
 
-            if (values.length > 0) {
+            if (resolvers && resolvers[type.name]) {
+              value = resolvers[type.name]();
+            } else if (values.length > 0) {
               // A GraphQL enum with no members should be impossible, but it's
               // not enforced in the types. In other words it is possible this
               // array is empty.

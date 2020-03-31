@@ -461,6 +461,46 @@ describe("fakeQL", () => {
     }).toThrow();
   });
 
+  it("supports custom enum type resolvers", () => {
+    const schema = buildSchema(`
+      type User {
+        name: String!
+        role: Role!
+      }
+
+      enum Role {
+        ADMIN
+        MEMBER
+      }
+
+      type Query {
+        me: User
+      }
+    `);
+    const document = parse(`
+      query {
+        me {
+          name
+          role
+        }
+      }
+    `);
+
+    const mock = fakeQL({
+      document,
+      schema,
+      resolvers: {
+        Role(): string {
+          return "MEMBER";
+        },
+      },
+    });
+
+    expect(mock).toEqual({
+      me: { name: `mock-value-for-field-"name"`, role: "MEMBER" },
+    });
+  });
+
   it("fails when document is invalid", () => {
     const schema = buildSchema(`type Query { x: String! }`);
     const document = parse(`
