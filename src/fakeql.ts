@@ -1,7 +1,6 @@
 import {
   visit,
   visitWithTypeInfo,
-  parse,
   isNonNullType,
   DocumentNode,
   validate,
@@ -77,14 +76,7 @@ export const fakeQL = ({
     throw new FakeQLError("Invalid Schema", schemaValidationErrors);
   }
 
-  const source =
-    document && document.loc && document.loc.source && document.loc.source.body;
-  if (!source) {
-    throw new FakeQLError("The provided document has no source");
-  }
-  const documentAST = parse(source);
-
-  const validationErrors = validate(schema, documentAST, validationRules);
+  const validationErrors = validate(schema, document, validationRules);
   if (validationErrors.length > 0) {
     throw new FakeQLError("Invalid Document", validationErrors);
   }
@@ -94,7 +86,7 @@ export const fakeQL = ({
   let mock: Mock = {};
   let path: (string | number)[] = [];
   visit(
-    documentAST,
+    document,
     visitWithTypeInfo(typeInfo, {
       Field: {
         enter(node): void {
