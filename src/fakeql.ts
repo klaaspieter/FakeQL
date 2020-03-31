@@ -138,7 +138,13 @@ const fakeFor = ({
       },
       FragmentSpread(node) {
         const fragment = fragments[node.name.value];
-        mock = set(mock, path, fragment);
+        const value = get(mock, path);
+
+        if (!value) {
+          mock = set(mock, path, fragment);
+        } else {
+          mock = set(mock, path, { ...value, ...fragment });
+        }
       },
     })
   );

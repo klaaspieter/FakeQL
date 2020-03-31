@@ -391,6 +391,43 @@ describe("fakeQL", () => {
     });
   });
 
+  it("merges fragments with existing mocks", () => {
+    const schema = buildSchema(`
+      type User {
+        id: ID!
+        name: String!
+        age: Int!
+      }
+
+      type Query {
+        me: User!
+      }
+    `);
+    const document = parse(`
+      query {
+        me {
+          name
+          ...user
+          age
+        }
+      }
+
+      fragment user on User {
+        id
+      }
+    `);
+
+    const mock = fakeQL({ document, schema });
+
+    expect(mock).toEqual({
+      me: {
+        id: `mock-value-for-field-"id"`,
+        name: `mock-value-for-field-"name"`,
+        age: 42,
+      },
+    });
+  });
+
   it("throws when spreading an unknown fragment", () => {
     const schema = buildSchema(`
       type User {
