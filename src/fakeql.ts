@@ -57,7 +57,7 @@ const valueForScalarType = (
   }
 };
 
-interface FakeForProps {
+interface FakeForArguments {
   ast: ASTNode;
   typeInfo: TypeInfo;
   resolvers?: MockResolverMap;
@@ -68,7 +68,7 @@ const fakeFor = ({
   typeInfo,
   resolvers,
   fragments,
-}: FakeForProps): Mock => {
+}: FakeForArguments): Mock => {
   let mock: Mock = {};
   let path: (string | number)[] = [];
   visit(
@@ -153,7 +153,7 @@ const fakeFor = ({
   return mock;
 };
 
-interface FakeQLProps {
+export interface FakeQLArguments {
   document: DocumentNode;
   schema?: GraphQLSchema | IntrospectionQuery;
   resolvers?: MockResolverMap;
@@ -164,7 +164,7 @@ export const fakeQL = ({
   schema,
   resolvers,
   validationRules,
-}: FakeQLProps): Mock => {
+}: FakeQLArguments): Mock => {
   if (schema && !isSchema(schema)) {
     schema = buildClientSchema(schema);
   }
