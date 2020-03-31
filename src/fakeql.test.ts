@@ -1,5 +1,7 @@
 import { parse, buildSchema, introspectionFromSchema } from "graphql";
-import { fakeQL } from "./index";
+import { fakeQL, FakeQLError } from "./index";
+
+import { writeFileSync, unlinkSync } from "fs";
 
 describe("fakeQL", () => {
   it("mocks scalars with default values", () => {
@@ -656,5 +658,40 @@ describe("fakeQL", () => {
         validationRules: [],
       })
     ).not.toThrow();
+  });
+
+  it("can take schema from graphql-config", () => {
+    writeFileSync(
+      "./.graphqlconfig",
+      JSON.stringify({ schemaPath: "./schema.json" })
+    );
+    writeFileSync(
+      "./schema.json",
+      JSON.stringify(
+        introspectionFromSchema(
+          buildSchema(`
+          type Query { x: String ! }
+        `)
+        ),
+        null,
+        2
+      )
+    );
+    const document = parse(`query { x }`);
+
+    const mock = fakeQL({ document });
+
+    expect(mock).toEqual({ x: `mock-value-for-field-"x"` });
+
+    unlinkSync("./schema.json");
+    unlinkSync("./.graphqlconfig");
+  });
+
+  it("fails when no schema is provided and graphql-config cannot be found", () => {
+    const document = parse(`query { x }`);
+
+    expect(() => {
+      fakeQL({ document });
+    }).toThrow(FakeQLError);
   });
 });

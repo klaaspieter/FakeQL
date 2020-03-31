@@ -22,6 +22,7 @@ import {
 import { FakeQLError } from "./error";
 import set from "lodash.set";
 import get from "lodash.get";
+import { getGraphQLProjectConfig } from "graphql-config";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Mock = Record<string, any>;
@@ -154,7 +155,7 @@ const fakeFor = ({
 
 interface FakeQLProps {
   document: DocumentNode;
-  schema: GraphQLSchema | IntrospectionQuery;
+  schema?: GraphQLSchema | IntrospectionQuery;
   resolvers?: MockResolverMap;
   validationRules?: ValidationRule[];
 }
@@ -164,8 +165,19 @@ export const fakeQL = ({
   resolvers,
   validationRules,
 }: FakeQLProps): Mock => {
-  if (!isSchema(schema)) {
+  if (schema && !isSchema(schema)) {
     schema = buildClientSchema(schema);
+  }
+
+  if (!schema) {
+    try {
+      schema = getGraphQLProjectConfig().getSchema();
+    } catch (error) {
+      throw new FakeQLError(
+        "There was a problem with your graphql-config and no schema was provided as an argument",
+        [error]
+      );
+    }
   }
 
   const schemaValidationErrors = validateSchema(schema);
