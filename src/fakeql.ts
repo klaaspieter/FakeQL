@@ -17,6 +17,7 @@ import {
   IntrospectionQuery,
   ValidationRule,
   isEnumType,
+  ASTNode,
 } from "graphql";
 import { FakeQLError } from "./error";
 import set from "lodash.set";
@@ -55,38 +56,22 @@ const valueForScalarType = (
   }
 };
 
-interface FakeQLProps {
-  document: DocumentNode;
-  schema: GraphQLSchema | IntrospectionQuery;
+interface FakeForProps {
+  ast: ASTNode;
+  typeInfo: TypeInfo;
   resolvers?: MockResolverMap;
-  validationRules?: ValidationRule[];
+  fragments: { [key: string]: Mock };
 }
-export const fakeQL = ({
-  document,
-  schema,
+const fakeFor = ({
+  ast,
+  typeInfo,
   resolvers,
-  validationRules,
-}: FakeQLProps): Mock => {
-  if (!isSchema(schema)) {
-    schema = buildClientSchema(schema);
-  }
-
-  const schemaValidationErrors = validateSchema(schema);
-  if (schemaValidationErrors.length > 0) {
-    throw new FakeQLError("Invalid Schema", schemaValidationErrors);
-  }
-
-  const validationErrors = validate(schema, document, validationRules);
-  if (validationErrors.length > 0) {
-    throw new FakeQLError("Invalid Document", validationErrors);
-  }
-
-  const typeInfo = new TypeInfo(schema);
-
+  fragments,
+}: FakeForProps): Mock => {
   let mock: Mock = {};
   let path: (string | number)[] = [];
   visit(
-    document,
+    ast,
     visitWithTypeInfo(typeInfo, {
       Field: {
         enter(node): void {
@@ -151,8 +136,61 @@ export const fakeQL = ({
           }
         },
       },
+      FragmentSpread(node) {
+        const fragment = fragments[node.name.value];
+        mock = set(mock, path, fragment);
+      },
     })
   );
 
   return mock;
+};
+
+interface FakeQLProps {
+  document: DocumentNode;
+  schema: GraphQLSchema | IntrospectionQuery;
+  resolvers?: MockResolverMap;
+  validationRules?: ValidationRule[];
+}
+export const fakeQL = ({
+  document,
+  schema,
+  resolvers,
+  validationRules,
+}: FakeQLProps): Mock => {
+  if (!isSchema(schema)) {
+    schema = buildClientSchema(schema);
+  }
+
+  const schemaValidationErrors = validateSchema(schema);
+  if (schemaValidationErrors.length > 0) {
+    throw new FakeQLError("Invalid Schema", schemaValidationErrors);
+  }
+
+  const validationErrors = validate(schema, document, validationRules);
+  if (validationErrors.length > 0) {
+    throw new FakeQLError("Invalid Document", validationErrors);
+  }
+
+  const typeInfo = new TypeInfo(schema);
+
+  const fragments: { [key: string]: Mock } = {};
+  const documentWithoutFragments = visit(document, {
+    FragmentDefinition(node) {
+      fragments[node.name.value] = fakeFor({
+        ast: node,
+        typeInfo,
+        fragments,
+        resolvers,
+      });
+      return null;
+    },
+  });
+
+  return fakeFor({
+    ast: documentWithoutFragments,
+    typeInfo,
+    resolvers,
+    fragments,
+  });
 };

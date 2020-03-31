@@ -333,6 +333,87 @@ describe("fakeQL", () => {
     });
   });
 
+  it("mocks fragments (fragment comes first)", () => {
+    const schema = buildSchema(`
+      type User {
+        name: String!
+      }
+
+      type Query {
+        me: User!
+      }
+    `);
+    const document = parse(`
+      fragment user on User {
+        name
+      }
+
+      query {
+        me {
+          ...user
+        }
+      }
+    `);
+
+    const mock = fakeQL({ document, schema });
+
+    expect(mock).toEqual({
+      me: { name: `mock-value-for-field-"name"` },
+    });
+  });
+
+  it("mocks fragments (fragment comes last)", () => {
+    const schema = buildSchema(`
+      type User {
+        name: String!
+      }
+
+      type Query {
+        me: User!
+      }
+    `);
+    const document = parse(`
+      query {
+        me {
+          ...user
+        }
+      }
+
+      fragment user on User {
+        name
+      }
+    `);
+
+    const mock = fakeQL({ document, schema });
+
+    expect(mock).toEqual({
+      me: { name: `mock-value-for-field-"name"` },
+    });
+  });
+
+  it("throws when spreading an unknown fragment", () => {
+    const schema = buildSchema(`
+      type User {
+        name: String!
+      }
+
+      type Query {
+        me: User!
+      }
+    `);
+    const document = parse(`
+      query {
+        me {
+          ...unknown
+        }
+      }
+    `);
+
+    expect(() => {
+      fakeQL({ document, schema });
+    }).toThrow();
+  });
+
   it("creates the schema from an IntrospectionQuery", () => {
     const schema = buildSchema(`
       type User {
