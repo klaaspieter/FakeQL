@@ -1,6 +1,6 @@
 {
   "name": "fakeql",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Automatic GraphQL mocks",
   "main": "build/index.js",
   "author": "Klaas Pieter Annema",
