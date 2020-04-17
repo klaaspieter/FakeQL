@@ -86,6 +86,148 @@ describe("fakeQL", () => {
     });
   });
 
+  it("mocks lists with scalars", () => {
+    const schema = buildSchema(`
+      type User {
+        hobbies: [String]!
+      }
+
+      type Query {
+        me: User
+      }
+    `);
+    const document = parse(`
+      query {
+        __typename
+        me {
+          __typename
+          hobbies
+        }
+      }
+    `);
+
+    const mock = fakeQL({ document, schema });
+
+    expect(mock).toEqual({
+      __typename: "Query",
+      me: {
+        __typename: "User",
+        hobbies: [`mock-value-for-field-"hobbies"`],
+      },
+    });
+  });
+
+  it("mocks lists with enums", () => {
+    const schema = buildSchema(`
+      type User {
+        roles: [Role]!
+      }
+
+      enum Role {
+        ADMIN
+        MEMBER
+      }
+
+      type Query {
+        me: User
+      }
+    `);
+    const document = parse(`
+      query {
+        me {
+          roles
+        }
+      }
+    `);
+
+    const mock = fakeQL({ document, schema });
+
+    expect(mock).toEqual({
+      me: {
+        roles: ["ADMIN"],
+      },
+    });
+  });
+
+  it("mocks lists with custom types", () => {
+    const schema = buildSchema(`
+      type User {
+        hobbies: [Hobby]!
+      }
+
+      type Hobby {
+        name: String!
+      }
+
+      type Query {
+        me: User
+      }
+    `);
+    const document = parse(`
+      query {
+        __typename
+        me {
+          __typename
+          hobbies {
+            __typename
+            name
+          }
+        }
+      }
+    `);
+
+    const mock = fakeQL({ document, schema });
+
+    expect(mock).toEqual({
+      __typename: "Query",
+      me: {
+        __typename: "User",
+        hobbies: [{ __typename: "Hobby", name: `mock-value-for-field-"name"` }],
+      },
+    });
+  });
+
+  it("mocks weirdly nested lists", () => {
+    const schema = buildSchema(`
+      type User {
+        name: String!
+        hobbies: [[[String!]!]!]
+        friends: [[[User!]!]!]!
+      }
+
+
+      type Query {
+        me: User
+      }
+    `);
+    const document = parse(`
+      query {
+        __typename
+        me {
+          __typename
+          hobbies
+          friends {
+            __typename
+            name
+          }
+        }
+      }
+    `);
+
+    const mock = fakeQL({ document, schema });
+
+    expect(mock).toEqual({
+      __typename: "Query",
+      me: {
+        __typename: "User",
+        hobbies: [[[`mock-value-for-field-"hobbies"`]]],
+        friends: [
+          [[{ __typename: "User", name: `mock-value-for-field-"name"` }]],
+        ],
+      },
+    });
+  });
+
   it("mocks custom enums", () => {
     const schema = buildSchema(`
       type User {
@@ -393,6 +535,133 @@ describe("fakeQL", () => {
     });
   });
 
+  it("mocks sibling fragments", () => {
+    const schema = buildSchema(`
+      type User {
+        name: String!
+        age: Int!
+      }
+
+      type Query {
+        me: User!
+      }
+    `);
+    const document = parse(`
+      query {
+        me {
+          ...user
+        }
+      }
+
+      fragment user on User {
+        ...name
+        ...age
+      }
+
+      fragment name on User {
+        name
+      }
+
+      fragment age on User {
+        age
+      }
+    `);
+
+    const mock = fakeQL({ document, schema });
+
+    expect(mock).toEqual({
+      me: {
+        name: `mock-value-for-field-"name"`,
+        age: 42,
+      },
+    });
+  });
+
+  it("mocks nested fragments", () => {
+    const schema = buildSchema(`
+      type User {
+        age: Int!
+        hobbies: [Hobby!]!
+      }
+
+      type Hobby {
+        name: String!
+      }
+
+      type Query {
+        me: User!
+      }
+    `);
+    const document = parse(`
+      query {
+        me {
+          ...user
+        }
+      }
+
+      fragment user on User {
+        ...hobbies
+        age
+      }
+
+      fragment hobbies on User {
+        hobbies {
+          name
+        }
+      }
+    `);
+
+    const mock = fakeQL({ document, schema });
+
+    expect(mock).toEqual({
+      me: {
+        hobbies: [{ name: `mock-value-for-field-"name"` }],
+        age: 42,
+      },
+    });
+  });
+
+  it("mocks nested list fragments", () => {
+    const schema = buildSchema(`
+      type User {
+        hobbies: [Hobby!]!
+      }
+
+      type Hobby {
+        name: String!
+      }
+
+      type Query {
+        me: User!
+      }
+    `);
+    const document = parse(`
+      query {
+        me {
+          ...user
+        }
+      }
+
+      fragment user on User {
+        hobbies {
+          ...hobby
+        }
+      }
+
+      fragment hobby on Hobby {
+        name
+      }
+    `);
+
+    const mock = fakeQL({ document, schema });
+
+    expect(mock).toEqual({
+      me: {
+        hobbies: [{ name: `mock-value-for-field-"name"` }],
+      },
+    });
+  });
+
   it("merges fragments with existing mocks", () => {
     const schema = buildSchema(`
       type User {
@@ -564,23 +833,6 @@ describe("fakeQL", () => {
     });
   });
 
-  it("fails when schema is invalid", () => {
-    const schema = buildSchema(`
-      # Schema is missing type Query
-      type Team {
-        name: String!
-        userCanAdminister: Boolean!
-      }
-    `);
-
-    expect(() => {
-      fakeQL({
-        document: parse(`query { me { name } }`),
-        schema,
-      });
-    }).toThrow();
-  });
-
   it("supports custom enum type resolvers", () => {
     const schema = buildSchema(`
       type User {
@@ -619,6 +871,23 @@ describe("fakeQL", () => {
     expect(mock).toEqual({
       me: { name: `mock-value-for-field-"name"`, role: "MEMBER" },
     });
+  });
+
+  it("fails when schema is invalid", () => {
+    const schema = buildSchema(`
+      # Schema is missing type Query
+      type Team {
+        name: String!
+        userCanAdminister: Boolean!
+      }
+    `);
+
+    expect(() => {
+      fakeQL({
+        document: parse(`query { me { name } }`),
+        schema,
+      });
+    }).toThrow();
   });
 
   it("fails when document is invalid", () => {

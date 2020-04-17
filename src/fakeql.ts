@@ -18,10 +18,12 @@ import {
   ValidationRule,
   isEnumType,
   ASTNode,
+  VisitFn,
+  isWrappingType,
+  FragmentDefinitionNode,
+  GraphQLEnumType,
 } from "graphql";
 import { FakeQLError } from "./error";
-import set from "lodash.set";
-import get from "lodash.get";
 import { getGraphQLProjectConfig } from "graphql-config";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -57,100 +59,190 @@ const valueForScalarType = (
   }
 };
 
-interface FakeForArguments {
+const valueForEnumType = (
+  type: GraphQLEnumType,
+  resolvers: MockResolverMap
+): string | undefined => {
+  const resolver = resolvers[type.name];
+
+  if (resolver) {
+    return resolver() as string;
+  }
+
+  const values = type.getValues();
+  // A GraphQL enum with no members should be impossible, but it's
+  // not enforced in the types so we double check it here.
+  if (values.length > 0) {
+    return values[0].name;
+  }
+};
+
+interface FakeReducerArguments {
   ast: ASTNode;
   typeInfo: TypeInfo;
-  resolvers?: MockResolverMap;
-  fragments: { [key: string]: Mock };
+  resolvers: MockResolverMap;
+  fragments: {
+    [key: string]: { definition: FragmentDefinitionNode; mock?: Mock };
+  };
 }
 const fakeFor = ({
   ast,
   typeInfo,
   resolvers,
   fragments,
-}: FakeForArguments): Mock => {
-  let mock: Mock = {};
-  let path: (string | number)[] = [];
-  visit(
+}: FakeReducerArguments): Mock => {
+  const notHandled: VisitFn<ASTNode, ASTNode> = () => null;
+
+  return visit(
     ast,
     visitWithTypeInfo(typeInfo, {
-      Field: {
-        enter(node): void {
+      leave: {
+        Document(node): Mock {
+          return node.definitions[0];
+        },
+
+        OperationDefinition(node): Mock {
+          return node.selectionSet;
+        },
+
+        SelectionSet(node): Mock {
           let type = typeInfo.getType();
 
           if (isNonNullType(type)) {
             type = type.ofType;
           }
 
-          if (isScalarType(type)) {
-            if (node.name.value === "__typename" && typeInfo.getParentType()) {
-              const parentType = typeInfo.getParentType() as GraphQLCompositeType;
-              mock = set(mock, [...path, node.name.value], parentType.name);
-            } else {
-              const defaultValue = valueForScalarType(
+          const object = node.selections.reduce(
+            (mock, selection) => ({ ...mock, ...selection }),
+            {}
+          );
+
+          return object;
+        },
+
+        FragmentSpread(node): Mock {
+          const fragment = fragments[node.name.value];
+
+          if (!fragment.mock) {
+            fragment.mock = fakeFor({
+              ast: fragment.definition.selectionSet,
+              typeInfo,
+              resolvers,
+              fragments,
+            });
+          }
+
+          return fragment.mock;
+        },
+
+        Field(node): Mock | null {
+          let type = typeInfo.getType();
+
+          if (isNonNullType(type)) {
+            type = type.ofType;
+          }
+
+          if (node.name.value === "__typename" && typeInfo.getParentType()) {
+            const parentType = typeInfo.getParentType() as GraphQLCompositeType;
+            return { __typename: parentType.name };
+          } else if (isScalarType(type)) {
+            return {
+              [node.name.value]: valueForScalarType(
                 type,
                 node.name.value,
                 resolvers
-              );
-              const value = get(mock, [...path, node.name.value], defaultValue);
-              mock = set(mock, [...path, node.name.value], value);
+              ),
+            };
+          } else if (isObjectType(type)) {
+            const resolver = resolvers[type.name];
+            if (resolver) {
+              const resolvedValue = resolver() as Mock;
+              return {
+                [node.name.value]: { ...node.selectionSet, ...resolvedValue },
+              };
             }
+
+            return { [node.name.value]: node.selectionSet };
           } else if (isListType(type)) {
-            path = [...path, node.name.value, 0];
-          } else if (isObjectType(type)) {
-            if (resolvers && resolvers[type.name]) {
-              mock = set(
-                mock,
-                [...path, node.name.value],
-                resolvers[type.name]()
-              );
+            let itemType = type.ofType;
+
+            let depth = 1;
+
+            while (isWrappingType(itemType)) {
+              if (isListType(itemType)) {
+                depth += 1;
+              }
+              itemType = itemType.ofType;
             }
-            path = [...path, node.name.value];
+
+            let value: unknown = node.selectionSet;
+            if (isScalarType(itemType)) {
+              value = valueForScalarType(itemType, node.name.value, resolvers);
+            } else if (isEnumType(itemType)) {
+              value = valueForEnumType(itemType, resolvers);
+            }
+
+            while (depth > 0) {
+              depth -= 1;
+
+              value = [value];
+            }
+
+            return {
+              [node.name.value]: value,
+            };
+
+            return { [node.name.value]: node.selectionSet };
           } else if (isEnumType(type)) {
-            const values = type.getValues();
-            let value: unknown;
-
-            if (resolvers && resolvers[type.name]) {
-              value = resolvers[type.name]();
-            } else if (values.length > 0) {
-              // A GraphQL enum with no members should be impossible, but it's
-              // not enforced in the types. In other words it is possible this
-              // array is empty.
-              value = values[0].name;
-            }
-
-            mock = set(mock, [...path, node.name.value], value);
+            return { [node.name.value]: valueForEnumType(type, resolvers) };
           }
+
+          return null;
         },
-        leave(): void {
-          let type = typeInfo.getType();
-
-          if (isNonNullType(type)) {
-            type = type.ofType;
-          }
-
-          if (isListType(type)) {
-            path.pop();
-            path.pop();
-          } else if (isObjectType(type)) {
-            path.pop();
-          }
+        Name(node): ASTNode {
+          return node;
         },
-      },
-      FragmentSpread(node) {
-        const fragment = fragments[node.name.value];
-        const value = get(mock, path);
 
-        if (!value) {
-          mock = set(mock, path, fragment);
-        } else {
-          mock = set(mock, path, { ...value, ...fragment });
-        }
+        VariableDefinition: notHandled,
+        Variable: notHandled,
+        Argument: notHandled,
+        InlineFragment: notHandled,
+        FragmentDefinition: notHandled,
+        IntValue: notHandled,
+        FloatValue: notHandled,
+        StringValue: notHandled,
+        BooleanValue: notHandled,
+        NullValue: notHandled,
+        EnumValue: notHandled,
+        ListValue: notHandled,
+        ObjectValue: notHandled,
+        ObjectField: notHandled,
+        Directive: notHandled,
+        NamedType: notHandled,
+        ListType: notHandled,
+        NonNullType: notHandled,
+        SchemaDefinition: notHandled,
+        OperationTypeDefinition: notHandled,
+        ScalarTypeDefinition: notHandled,
+        ObjectTypeDefinition: notHandled,
+        FieldDefinition: notHandled,
+        InputValueDefinition: notHandled,
+        InterfaceTypeDefinition: notHandled,
+        UnionTypeDefinition: notHandled,
+        EnumTypeDefinition: notHandled,
+        EnumValueDefinition: notHandled,
+        InputObjectTypeDefinition: notHandled,
+        DirectiveDefinition: notHandled,
+        SchemaExtension: notHandled,
+        ScalarTypeExtension: notHandled,
+        ObjectTypeExtension: notHandled,
+        InterfaceTypeExtension: notHandled,
+        UnionTypeExtension: notHandled,
+        EnumTypeExtension: notHandled,
+        InputObjectTypeExtension: notHandled,
       },
     })
   );
-
-  return mock;
 };
 
 export interface FakeQLArguments {
@@ -162,7 +254,7 @@ export interface FakeQLArguments {
 export const fakeQL = ({
   document,
   schema,
-  resolvers,
+  resolvers = {},
   validationRules,
 }: FakeQLArguments): Mock => {
   if (schema && !isSchema(schema)) {
@@ -192,23 +284,17 @@ export const fakeQL = ({
 
   const typeInfo = new TypeInfo(schema);
 
-  const fragments: { [key: string]: Mock } = {};
-  const documentWithoutFragments = visit(document, {
-    FragmentDefinition(node) {
-      fragments[node.name.value] = fakeFor({
-        ast: node,
-        typeInfo,
-        fragments,
-        resolvers,
-      });
-      return null;
-    },
-  });
+  const fragments: {
+    [key: string]: { definition: FragmentDefinitionNode; mock?: Mock };
+  } = {};
 
-  return fakeFor({
-    ast: documentWithoutFragments,
-    typeInfo,
-    resolvers,
-    fragments,
-  });
+  for (const definition of document.definitions) {
+    if (definition.kind !== "FragmentDefinition") {
+      continue;
+    }
+
+    fragments[definition.name.value] = { definition };
+  }
+
+  return fakeFor({ ast: document, typeInfo, resolvers, fragments });
 };
