@@ -34,8 +34,6 @@
   },
   "dependencies": {
     "graphql": "^14.0.0",
-    "graphql-config": "^2.2.2",
-    "lodash.get": "^4.4.2",
-    "lodash.set": "^4.3.2"
+    "graphql-config": "^2.2.2"
   }
 }
